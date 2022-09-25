@@ -7,7 +7,9 @@ import FWCore.ParameterSet.Config as cms
 
 import FWCore.ParameterSet.VarParsing as VarParsing
 options = VarParsing.VarParsing('analysis')
-options.register('jobNum', 0, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, 'Job number for tasks involving multiple generation jobs. Defaults to 1')
+options.register('randomNumber', 0, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, 'Random seed for tasks involving multiple generation jobs. Defaults to 0')
+options.register('nEventsPerJob', 100, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, 'Number of events in a job. Defaults to 100')
+
 options.parseArguments()
 
 from Configuration.Eras.Era_Run3_cff import Run3
@@ -31,7 +33,7 @@ process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
 process.maxEvents = cms.untracked.PSet(
-        input = cms.untracked.int32(100),
+        input = cms.untracked.int32(options.nEventsPerJob),
         output = cms.optional.untracked.allowed(cms.int32,cms.PSet)
 )
 
@@ -48,7 +50,7 @@ process.source = cms.Source("EmptySource")
 
 from IOMC.RandomEngine.RandomServiceHelper import RandomNumberServiceHelper
 randHelper = RandomNumberServiceHelper(process.RandomNumberGeneratorService)
-randHelper.resetSeeds(1234+options.jobNum)
+randHelper.resetSeeds(options.randomNumber)
 
 #This is removed entirely in the SUEP configuration
 process.options = cms.untracked.PSet(
