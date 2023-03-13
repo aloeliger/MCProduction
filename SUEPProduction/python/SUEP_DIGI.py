@@ -2,7 +2,7 @@
 # using: 
 # Revision: 1.19 
 # Source: /local/reps/CMSSW/CMSSW/Configuration/Applications/python/ConfigBuilder.py,v 
-# with command line options: step1 --filein file:output.root --fileout file:output_DIGI.root --mc --eventcontent RAWSIM --pileup NoPileUp --datatier GEN-SIM-RAW --conditions 124X_mcRun3_2022_realistic_v8 --step DIGI,L1,DIGI2RAW --nThreads 4 --geometry DB:Extended --era Run3 -n -1
+# with command line options: step1 --filein file:out.root --fileout file:out_DIGI.root --mc --eventcontent RAWSIM --pileup NoPileUp --datatier GEN-SIM-RAW --conditions 124X_mcRun3_2022_realistic_v8 --step DIGI,L1,DIGI2RAW,HLT --nThreads 4 --geometry DB:Extended --era Run3 -n -1
 import FWCore.ParameterSet.Config as cms
 
 import FWCore.ParameterSet.VarParsing as VarParsing
@@ -11,7 +11,7 @@ options.parseArguments()
 
 from Configuration.Eras.Era_Run3_cff import Run3
 
-process = cms.Process('DIGI2RAW',Run3)
+process = cms.Process('HLT',Run3)
 
 # import of standard configurations
 process.load('Configuration.StandardSequences.Services_cff')
@@ -24,6 +24,7 @@ process.load('Configuration.StandardSequences.MagneticField_cff')
 process.load('Configuration.StandardSequences.Digi_cff')
 process.load('Configuration.StandardSequences.SimL1Emulator_cff')
 process.load('Configuration.StandardSequences.DigiToRaw_cff')
+process.load('HLTrigger.Configuration.HLT_GRun_cff')
 process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
@@ -55,7 +56,8 @@ process.source = cms.Source("PoolSource",
                                 'drop *_genMetTrue_*_*',
                                 'drop *_genMetIC5GenJs_*_*'
                             ),
-    secondaryFileNames = cms.untracked.vstring()
+                            secondaryFileNames = cms.untracked.vstring(),
+                            duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 )
 
 process.options = cms.untracked.PSet(
@@ -98,12 +100,12 @@ process.configurationMetadata = cms.untracked.PSet(
 # Output definition
 
 process.RAWSIMoutput = cms.OutputModule("PoolOutputModule",
-                                        compressionAlgorithm = cms.untracked.string('LZMA'),
-                                        compressionLevel = cms.untracked.int32(1),
-                                        dataset = cms.untracked.PSet(
-                                            dataTier = cms.untracked.string('GEN-SIM-RAW'),
-                                            filterName = cms.untracked.string('')
-                                        ),
+    compressionAlgorithm = cms.untracked.string('LZMA'),
+    compressionLevel = cms.untracked.int32(1),
+    dataset = cms.untracked.PSet(
+        dataTier = cms.untracked.string('GEN-SIM-RAW'),
+        filterName = cms.untracked.string('')
+    ),
     eventAutoFlushCompressedSize = cms.untracked.int32(20971520),
                                         fileName = cms.untracked.string(options.outputFile),
                                         outputCommands = process.RAWSIMEventContent.outputCommands,
@@ -124,7 +126,11 @@ process.endjob_step = cms.EndPath(process.endOfProcess)
 process.RAWSIMoutput_step = cms.EndPath(process.RAWSIMoutput)
 
 # Schedule definition
-process.schedule = cms.Schedule(process.digitisation_step,process.L1simulation_step,process.digi2raw_step,process.endjob_step,process.RAWSIMoutput_step)
+# process.schedule imported from cff in HLTrigger.Configuration
+process.schedule.insert(0, process.digitisation_step)
+process.schedule.insert(1, process.L1simulation_step)
+process.schedule.insert(2, process.digi2raw_step)
+process.schedule.extend([process.endjob_step,process.RAWSIMoutput_step])
 from PhysicsTools.PatAlgos.tools.helpers import associatePatAlgosToolsTask
 associatePatAlgosToolsTask(process)
 
@@ -132,6 +138,15 @@ associatePatAlgosToolsTask(process)
 process.options.numberOfThreads = 4
 process.options.numberOfStreams = 0
 
+# customisation of the process.
+
+# Automatic addition of the customisation function from HLTrigger.Configuration.customizeHLTforMC
+from HLTrigger.Configuration.customizeHLTforMC import customizeHLTforMC 
+
+#call to customisation function customizeHLTforMC imported from HLTrigger.Configuration.customizeHLTforMC
+process = customizeHLTforMC(process)
+
+# End of customisation functions
 
 
 # Customisation from command line
